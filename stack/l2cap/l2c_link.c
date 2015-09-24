@@ -1347,7 +1347,7 @@ void l2c_link_check_send_pkts (tL2C_LCB *p_lcb, tL2C_CCB *p_ccb, BT_HDR *p_buf)
 #else
                 ))
 #endif
-            break;
+            continue;
 
 
             /* Check for wraparound */
