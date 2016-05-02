@@ -39,7 +39,6 @@
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <sys/poll.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -72,6 +71,7 @@ static int number =0;
 
 #define CTRL_CHAN_RETRY_COUNT 3
 #define USEC_PER_SEC 1000000L
+#define SOCK_SEND_RECV_TIMEOUT_MS 3000  /* Timeout for sending/receiving */
 
 #define CASE_RETURN_STR(const) case const: return #const;
 
@@ -246,14 +246,23 @@ static int skt_connect(char *path, size_t buffer_sz)
 
     len = buffer_sz;
     ret = setsockopt(skt_fd, SOL_SOCKET, SO_SNDBUF, (char*)&len, (int)sizeof(len));
-
-    /* only issue warning if failed */
     if (ret < 0)
         ERROR("setsockopt failed (%s)", strerror(errno));
 
     ret = setsockopt(skt_fd, SOL_SOCKET, SO_RCVBUF, (char*)&len, (int)sizeof(len));
+    if (ret < 0)
+        ERROR("setsockopt failed (%s)", strerror(errno));
 
-    /* only issue warning if failed */
+    /* Socket send/receive timeout value */
+    struct timeval tv;
+    tv.tv_sec = SOCK_SEND_RECV_TIMEOUT_MS / 1000;
+    tv.tv_usec = (SOCK_SEND_RECV_TIMEOUT_MS % 1000) * 1000;
+
+    ret = setsockopt(skt_fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    if (ret < 0)
+        ERROR("setsockopt failed (%s)", strerror(errno));
+
+    ret = setsockopt(skt_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     if (ret < 0)
         ERROR("setsockopt failed (%s)", strerror(errno));
 
@@ -265,8 +274,6 @@ static int skt_connect(char *path, size_t buffer_sz)
 static int skt_read(int fd, void *p, size_t len)
 {
     int read;
-    struct pollfd pfd;
-    struct timespec ts;
 
     FNLOG();
 
@@ -274,7 +281,7 @@ static int skt_read(int fd, void *p, size_t len)
 
     if ((read = TEMP_FAILURE_RETRY(recv(fd, p, len, MSG_NOSIGNAL))) == -1)
     {
-        ERROR("write failed with errno=%d\n", errno);
+        ERROR("read failed with errno=%d\n", errno);
         return -1;
     }
 
@@ -284,18 +291,8 @@ static int skt_read(int fd, void *p, size_t len)
 static int skt_write(int fd, const void *p, size_t len)
 {
     int sent;
-    struct pollfd pfd;
 
     FNLOG();
-
-    pfd.fd = fd;
-    pfd.events = POLLOUT;
-
-    /* poll for 500 ms */
-
-    /* send time out */
-    if (TEMP_FAILURE_RETRY(poll(&pfd, 1, 500)) == 0)
-        return 0;
 
     ts_log("skt_write", len, NULL);
 
