@@ -4169,10 +4169,7 @@ static void btif_media_aa_prep_sbc_2_send(UINT8 nb_frame)
                 size_t frames  = blocm_x_subband * btif_media_cb.encoder.s16NumOfChannels;
                 memcpy_by_audio_format(btif_media_cb.encoder.as16PcmBuffer, AUDIO_FORMAT_PCM_16_BIT, btif_media_cb.encoder.as32PcmBuffer, AUDIO_FORMAT_PCM_8_24_BIT, frames);
 
-                /* SBC encode and descramble frame */
                 SBC_Encoder(&(btif_media_cb.encoder));
-                A2D_SbcChkFrInit(btif_media_cb.encoder.pu8Packet);
-                A2D_SbcDescramble(btif_media_cb.encoder.pu8Packet, btif_media_cb.encoder.u16PacketLength);
                 /* Update SBC frame length */
                 p_buf->len += btif_media_cb.encoder.u16PacketLength;
                 nb_frame--;
