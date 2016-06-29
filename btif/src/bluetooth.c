@@ -193,9 +193,9 @@ static void cleanup(void) {
 
 static void ssrcleanup(void)
 {
-#ifdef QCA_BT_ROME
-    btif_ssr_cleanup();
-#endif
+    int soc_type = get_soc_type();
+    if (soc_type == BT_SOC_ROME || soc_type == BT_SOC_CHEROKEE)
+        btif_ssr_cleanup();
     return;
 }
 

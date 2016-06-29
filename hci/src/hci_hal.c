@@ -18,6 +18,7 @@
 
 #include "hci_hal.h"
 #include "hci_internals.h"
+#include "bt_utils.h"
 #if (defined(REMOVE_EAGER_THREADS) && (REMOVE_EAGER_THREADS == TRUE))
 #include <assert.h>
 #include <string.h>
@@ -26,12 +27,15 @@
 #include "log.h"
 #endif
 
+bt_soc_type soc_type;
+
 const hci_hal_t *hci_hal_get_interface() {
-#if HCI_USE_MCT
-  return hci_hal_mct_get_interface();
-#else
-  return hci_hal_h4_get_interface();
-#endif
+ soc_type = get_soc_type();
+if (soc_type == BT_SOC_ROME || soc_type == BT_SOC_CHEROKEE) {
+        return hci_hal_h4_get_interface();
+    } else {
+        return hci_hal_mct_get_interface();
+    }
 }
 
 #if (defined(REMOVE_EAGER_THREADS) && (REMOVE_EAGER_THREADS == TRUE))

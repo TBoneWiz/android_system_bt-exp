@@ -51,6 +51,16 @@ typedef enum {
     METHOD_NAME
 } tBLACKLIST_METHOD;
 
+typedef enum {
+    BT_SOC_DEFAULT = 0,
+    BT_SOC_SMD = BT_SOC_DEFAULT,
+    BT_SOC_AR3K,
+    BT_SOC_ROME,
+    BT_SOC_CHEROKEE,
+    /* Add chipset type here */
+    BT_SOC_RESERVED
+} bt_soc_type;
+
 #define MAX_NAME_LEN                  (50)
 #define IOT_DEV_BASE_CONF_FILE        "/etc/bluetooth/iot_devlist.conf"
 #define IOT_DEV_CONF_FILE             "/data/misc/bluedroid/iot_devlist.conf"
@@ -97,4 +107,5 @@ static inline uint64_t time_now_us()
     return ((uint64_t)ts_now.tv_sec * USEC_PER_SEC) + ((uint64_t)ts_now.tv_nsec / 1000);
 #endif
 }
+bt_soc_type get_soc_type();
 #endif /* BT_UTILS_H */
