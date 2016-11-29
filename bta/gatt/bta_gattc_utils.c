@@ -303,6 +303,12 @@ void bta_gattc_clcb_dealloc(tBTA_GATTC_CLCB *p_clcb)
             p_srcb->connected = FALSE;
             p_srcb->state = BTA_GATTC_SERV_IDLE;
             p_srcb->mtu = 0;
+
+            /* clean up cache */
+            if (p_srcb->p_srvc_cache) {
+                list_free(p_srcb->p_srvc_cache);
+                p_srcb->p_srvc_cache = NULL;
+            }
         }
 
         utl_freebuf((void **)&p_clcb->p_q_cmd);
