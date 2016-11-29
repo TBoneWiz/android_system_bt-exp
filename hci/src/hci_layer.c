@@ -496,13 +496,12 @@ static void event_command_ready(fixed_queue_t *queue, UNUSED_ATTR void *context)
 #else
     low_power_manager->stop_idle_timer();
 #endif
-    packet_fragmenter->fragment_and_dispatch(wait_entry->command);
 #ifdef BOARD_HAVE_BLUETOOTH_BCM
     low_power_manager->transmit_done();
 #else
     low_power_manager->start_idle_timer(false);
 #endif
-
+    packet_fragmenter->fragment_and_dispatch(wait_entry->command);
   }
 }
 
