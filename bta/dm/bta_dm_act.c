@@ -511,7 +511,7 @@ static void bta_dm_disable_timer_cback (TIMER_LIST_ENT *p_tle)
         bta_dm_cb.disabling = FALSE;
 
         bta_sys_remove_uuid(UUID_SERVCLASS_PNP_INFORMATION);
-        bta_dm_cb.p_sec_cback(BTA_DM_DISABLE_EVT, NULL);
+        bta_dm_disable_conn_down_timer_cback(NULL);
     }
 }
 
