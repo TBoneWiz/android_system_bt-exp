@@ -95,13 +95,25 @@ void fixed_queue_free(fixed_queue_t *queue, fixed_queue_free_cb free_cb) {
 }
 
 bool fixed_queue_is_empty(fixed_queue_t *queue) {
-  assert(queue != NULL);
+  if (queue == NULL)
+    return true;
 
   pthread_mutex_lock(&queue->lock);
   bool is_empty = list_is_empty(queue->list);
   pthread_mutex_unlock(&queue->lock);
 
   return is_empty;
+}
+
+size_t fixed_queue_length(fixed_queue_t *queue) {
+  if (queue == NULL)
+    return 0;
+
+  pthread_mutex_lock(&queue->lock);
+  size_t length = list_length(queue->list);
+  pthread_mutex_unlock(&queue->lock);
+
+  return length;
 }
 
 size_t fixed_queue_capacity(fixed_queue_t *queue) {
@@ -154,7 +166,8 @@ bool fixed_queue_try_enqueue(fixed_queue_t *queue, void *data) {
 }
 
 void *fixed_queue_try_dequeue(fixed_queue_t *queue) {
-  assert(queue != NULL);
+  if (queue == NULL)
+    return NULL;
 
   if (!semaphore_try_wait(queue->dequeue_sem)) {
       LOG_ERROR("%s:Failed to dequeue_sem", __func__);
@@ -172,7 +185,8 @@ void *fixed_queue_try_dequeue(fixed_queue_t *queue) {
 }
 
 void *fixed_queue_try_peek(fixed_queue_t *queue) {
-  assert(queue != NULL);
+  if (queue == NULL)
+    return NULL;
 
   pthread_mutex_lock(&queue->lock);
   // Because protected by the lock, the empty and front calls are atomic and not a race condition
