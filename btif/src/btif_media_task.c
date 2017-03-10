@@ -1787,6 +1787,9 @@ static void btif_media_thread_cleanup(UNUSED_ATTR void *context) {
   btif_media_cb.RxSbcQ = NULL;
 #endif
 
+  APPL_TRACE_IMP(" before close the UIPC channnel, ack the pending cmd");
+  a2dp_cmd_acknowledge(A2DP_CTRL_ACK_SUCCESS);
+
   /* this calls blocks until uipc is fully closed */
   UIPC_Close(UIPC_CH_ID_ALL);
 
