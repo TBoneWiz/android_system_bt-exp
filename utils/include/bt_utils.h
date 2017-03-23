@@ -58,7 +58,6 @@ typedef enum {
 #define IOT_ROLE_CHANGE_BLACKLIST     "RoleChangeBlacklistAddr"
 #define COD_AUDIO_DEVICE              (0x200400)
 void raise_priority_a2dp(tHIGH_PRIORITY_TASK high_task);
-void adjust_priority_a2dp(int start);
 void load_iot_devlist(const char *filename);
 void unload_iot_devlist();
 bool is_device_present(char* header, unsigned char* device_details);

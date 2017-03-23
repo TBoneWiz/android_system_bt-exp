@@ -23,6 +23,7 @@
 #include <hardware/bluetooth.h>
 #include <inttypes.h>
 #include <malloc.h>
+#include <pthread.h>
 #include <string.h>
 #include <signal.h>
 #include <time.h>
@@ -34,6 +35,10 @@
 #include "osi/include/osi.h"
 #include "osi/include/semaphore.h"
 #include "osi/include/thread.h"
+
+// Callback and timer threads should run at RT priority in order to ensure they
+// meet audio deadlines.  Use this priority for all audio/timer related thread.
+static const int THREAD_RT_PRIORITY = 1;
 
 struct alarm_t {
   // The lock is held while the callback for this alarm is being executed.
@@ -226,9 +231,18 @@ static bool lazy_initialize(void) {
   }
 
   struct sigevent sigevent;
+  // create timer with RT priority thread
+  pthread_attr_t thread_attr;
+  pthread_attr_init(&thread_attr);
+  pthread_attr_setschedpolicy(&thread_attr, SCHED_FIFO);
+  struct sched_param param;
+  param.sched_priority = THREAD_RT_PRIORITY;
+  pthread_attr_setschedparam(&thread_attr, &param);
+
   memset(&sigevent, 0, sizeof(sigevent));
   sigevent.sigev_notify = SIGEV_THREAD;
   sigevent.sigev_notify_function = (void (*)(union sigval))timer_callback;
+  sigevent.sigev_notify_attributes = (void*)(&thread_attr);
   if (timer_create(CLOCK_ID, &sigevent, &timer) == -1) {
     LOG_ERROR("%s unable to create timer: %s", __func__, strerror(errno));
     return false;
@@ -246,6 +260,7 @@ static bool lazy_initialize(void) {
     LOG_ERROR("%s unable to create alarm callback thread.", __func__);
     return false;
   }
+  thread_set_rt_priority(callback_thread, THREAD_RT_PRIORITY);
 
   thread_post(callback_thread, callback_dispatch, NULL);
   return true;
