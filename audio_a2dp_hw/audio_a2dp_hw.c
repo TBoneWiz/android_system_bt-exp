@@ -714,8 +714,7 @@ static ssize_t out_write(struct audio_stream_out *stream, const void* buffer,
     }
     #endif
 
-    if (sent == -1)
-    {
+    if (sent == -1) {
         skt_disconnect(out->common.audio_fd);
         out->common.audio_fd = AUDIO_SKT_DISCONNECTED;
         if (out->common.state != AUDIO_A2DP_STATE_SUSPENDED)
