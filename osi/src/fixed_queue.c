@@ -170,7 +170,6 @@ void *fixed_queue_try_dequeue(fixed_queue_t *queue) {
     return NULL;
 
   if (!semaphore_try_wait(queue->dequeue_sem)) {
-      LOG_ERROR("%s:Failed to dequeue_sem", __func__);
       return NULL;
   }
 
