@@ -1640,14 +1640,14 @@ update_call_states:
 
 /*******************************************************************************
 **
-** Function         btif_hf_is_call_vr_idle
+** Function         btif_hf_is_call_idle
 **
 ** Description      returns true if no call is in progress
 **
 ** Returns          bt_status_t
 **
 *******************************************************************************/
-BOOLEAN btif_hf_is_call_vr_idle()
+BOOLEAN btif_hf_is_call_idle()
 {
     int i, j = 1;
 
