@@ -236,6 +236,7 @@ static void bta_pan_data_buf_ind_cback(UINT16 handle, BD_ADDR src, BD_ADDR dst, 
 
     if ( sizeof(tBTA_PAN_DATA_PARAMS) > p_buf->offset )
     {
+        if (sizeof(BT_HDR) + sizeof(tBTA_PAN_DATA_PARAMS) + p_buf->len >
             GKI_get_pool_bufsize(PAN_POOL_ID)) {
             android_errorWriteLog(0x534e4554, "63146237");
             APPL_TRACE_ERROR("%s: received buffer length too large: %d", __func__,
