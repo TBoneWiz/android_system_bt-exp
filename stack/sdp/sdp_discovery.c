@@ -245,7 +245,7 @@ void sdp_disc_server_rsp (tCONN_CB *p_ccb, BT_HDR *p_msg)
 
     /* Got a reply!! Check what we got back */
     p = (UINT8 *)(p_msg + 1) + p_msg->offset;
-    uint8_t* p_end = p + p_msg->len;
+    UINT8 *p_end = p + p_msg->len;
 
     BE_STREAM_TO_UINT8 (rsp_pdu, p);
 
@@ -295,8 +295,8 @@ void sdp_disc_server_rsp (tCONN_CB *p_ccb, BT_HDR *p_msg)
 ** Returns          void
 **
 *******************************************************************************/
-static void process_service_search_rsp (tCONN_CB* p_ccb, uint8_t* p_reply,
-                                        uint8_t* p_reply_end)
+static void process_service_search_rsp (tCONN_CB *p_ccb, UINT8 *p_reply,
+                                        UINT8 *p_reply_end)
 {
     UINT16      xx;
     UINT16      total, cur_handles, orig;
@@ -415,8 +415,8 @@ static void sdp_copy_raw_data (tCONN_CB *p_ccb, BOOLEAN offset)
 ** Returns          void
 **
 *******************************************************************************/
-static void process_service_attr_rsp (tCONN_CB* p_ccb, uint8_t* p_reply,
-                                      uint8_t* p_reply_end)
+static void process_service_attr_rsp (tCONN_CB *p_ccb, UINT8 *p_reply,
+                                      UINT8 *p_reply_end)
 {
     UINT8           *p_start, *p_param_len;
     UINT16          param_len, list_byte_count;
@@ -696,9 +696,9 @@ static void process_service_search_attr_rsp (tCONN_CB* p_ccb, uint8_t* p_reply,
             if ((p_reply + *p_reply + 1) <= p_reply_end) {
                 memcpy(p, p_reply, *p_reply + 1);
                 p += *p_reply + 1;
-            } else {
-                android_errorWriteLog(0x534e4554, "68161546");
             }
+            else
+                android_errorWriteLog(0x534e4554, "68161546");
         }
         else
             UINT8_TO_BE_STREAM (p, 0);

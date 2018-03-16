@@ -489,7 +489,7 @@ static void bnep_data_ind (UINT16 l2cap_cid, BT_HDR *p_buf)
     if (type >= sizeof(bnep_frame_hdr_sizes) / sizeof(bnep_frame_hdr_sizes[0])) {
         BNEP_TRACE_EVENT("BNEP - rcvd frame, bad type: 0x%02x", type);
         android_errorWriteLog(0x534e4554, "68818034");
-        osi_free(p_buf);
+        GKI_freebuf (p_buf);
         return;
     }
     if ((rem_len <= bnep_frame_hdr_sizes[type]) || (rem_len > BNEP_MTU_SIZE))
@@ -572,7 +572,8 @@ static void bnep_data_ind (UINT16 l2cap_cid, BT_HDR *p_buf)
             p_bcb->con_state != BNEP_STATE_CONNECTED &&
             extension_present && p && rem_len)
         {
-            GKI_freebuf(p_bcb->p_pending_data);
+            if (p_bcb->p_pending_data)
+                GKI_freebuf (p_bcb->p_pending_data);
             p_bcb->p_pending_data = (BT_HDR *)GKI_getbuf (rem_len + sizeof(BT_HDR));
             if (p_bcb->p_pending_data)
             {
