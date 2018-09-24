@@ -74,6 +74,7 @@
 
 #include "osi/include/alarm.h"
 #include "osi/include/fixed_queue.h"
+#include "osi/include/properties.h"
 #include "osi/include/log.h"
 
 #if (BTA_AV_INCLUDED == TRUE)
@@ -110,6 +111,7 @@ OI_INT16 pcmData[15*SBC_MAX_SAMPLES_PER_FRAME*SBC_MAX_CHANNELS];
 #include "bta_api.h"
 #endif
 
+#define A2DP_SBC_HD_PROP "persist.bt.sbc_hd_higher_kbps"
 
 /*****************************************************************************
  **  Constants
@@ -210,12 +212,16 @@ enum {
 
 #ifdef BTA_AV_SPLIT_A2DP_DEF_FREQ_48KHZ
 #define DEFAULT_SBC_BITRATE 496
+#define BTIF_A2DP_3DH5_BITRATE 601
+#define BTIF_A2DP_2DH5_ALT_BITRATE 649
 
 #ifndef BTIF_A2DP_NON_EDR_MAX_RATE
 #define BTIF_A2DP_NON_EDR_MAX_RATE 237
 #endif
 #else
 #define DEFAULT_SBC_BITRATE 455
+#define BTIF_A2DP_3DH5_BITRATE 552
+#define BTIF_A2DP_2DH5_ALT_BITRATE 596
 
 #ifndef BTIF_A2DP_NON_EDR_MAX_RATE
 #define BTIF_A2DP_NON_EDR_MAX_RATE 229
@@ -233,7 +239,7 @@ enum {
 
 /* 2DH5 payload size (679 bytes) - (4 bytes L2CAP Header + 12 bytes AVDTP Header) */
 #define MAX_2MBPS_AVDTP_MTU         663
-
+#define MIN_3MBPS_AVDTP_SAFE_MTU    800
 #define USEC_PER_SEC 1000000L
 #define TPUT_STATS_INTERVAL_US (3000*1000)
 
@@ -876,6 +882,12 @@ static UINT16 btif_media_task_get_sbc_rate(void)
     {
         rate = BTIF_A2DP_NON_EDR_MAX_RATE;
         APPL_TRACE_DEBUG("non-edr a2dp sink detected, restrict rate to %d", rate);
+    } else if (btif_av_peer_supports_3mbps()
+               && btif_media_cb.TxAaMtuSize >= MIN_3MBPS_AVDTP_SAFE_MTU) {
+        rate = BTIF_A2DP_3DH5_BITRATE;
+    } else if (!btif_av_peer_supports_3mbps()
+               && property_get_int32(A2DP_SBC_HD_PROP, 0)) {
+        rate = BTIF_A2DP_2DH5_ALT_BITRATE;
     }
 
     return rate;
