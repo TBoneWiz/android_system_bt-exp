@@ -209,13 +209,13 @@ enum {
 #endif
 
 #ifdef BTA_AV_SPLIT_A2DP_DEF_FREQ_48KHZ
-#define DEFAULT_SBC_BITRATE 345
+#define DEFAULT_SBC_BITRATE 496
 
 #ifndef BTIF_A2DP_NON_EDR_MAX_RATE
 #define BTIF_A2DP_NON_EDR_MAX_RATE 237
 #endif
 #else
-#define DEFAULT_SBC_BITRATE 328
+#define DEFAULT_SBC_BITRATE 455
 
 #ifndef BTIF_A2DP_NON_EDR_MAX_RATE
 #define BTIF_A2DP_NON_EDR_MAX_RATE 229
@@ -228,8 +228,8 @@ enum {
 #else
 #define A2DP_HDR_SIZE               1
 #endif
-#define MAX_SBC_HQ_FRAME_SIZE_44_1  119
-#define MAX_SBC_HQ_FRAME_SIZE_48    115
+#define MAX_SBC_HQ_FRAME_SIZE_44_1  165
+#define MAX_SBC_HQ_FRAME_SIZE_48    165
 
 /* 2DH5 payload size (679 bytes) - (4 bytes L2CAP Header + 12 bytes AVDTP Header) */
 #define MAX_2MBPS_AVDTP_MTU         663
