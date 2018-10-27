@@ -34,9 +34,8 @@
 #include "bta_av_co.h"
 #include "bta_av_ci.h"
 #include "bta_av_sbc.h"
-
 #include "osi/include/thread.h"
-#include "osi/include/properties.h"
+#include <cutils/properties.h>
 #include "bt_utils.h"
 #include "a2d_aptx.h"
 #include "a2d_aptx_hd.h"
@@ -76,7 +75,6 @@
 #define BTA_AV_CO_SBC_MAX_BITPOOL_OFF  6
 
 #define BTA_AV_CO_SBC_MAX_BITPOOL 76
-#define A2DP_SBC_HD_ENABLE_PROP "persist.bt.sbc_hd_enabled"
 
 /* SCMS-T protect info */
 const UINT8 bta_av_co_cp_scmst[BTA_AV_CP_INFO_LEN] = "\x02\x02\x00";
@@ -574,18 +572,32 @@ void bta_av_build_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap)
     else if (src_cap.samp_freq & A2D_SBC_IE_SAMP_FREQ_44)
         pref_cap.samp_freq = A2D_SBC_IE_SAMP_FREQ_44;
 
-    if (property_get_int32(A2DP_SBC_HD_ENABLE_PROP, 0)
-            && (src_cap.ch_mode & A2D_SBC_IE_CH_MD_DUAL))
+    if (src_cap.ch_mode & A2D_SBC_IE_CH_MD_DUAL 
+      && P_SBC != property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
+        if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"2") < 0)
+            BTIF_TRACE_ERROR("Failed to set acive codec property");
         pref_cap.ch_mode = A2D_SBC_IE_CH_MD_DUAL;
-    else if (src_cap.ch_mode & A2D_SBC_IE_CH_MD_JOINT)
+    }
+    else if (src_cap.ch_mode & A2D_SBC_IE_CH_MD_JOINT) {
+        if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"1") < 0)
+            BTIF_TRACE_ERROR("Failed to set acive codec property");
         pref_cap.ch_mode = A2D_SBC_IE_CH_MD_JOINT;
-    else if (src_cap.ch_mode & A2D_SBC_IE_CH_MD_STEREO)
+    }
+    else if (src_cap.ch_mode & A2D_SBC_IE_CH_MD_STEREO) {
+        if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"1") < 0)
+            BTIF_TRACE_ERROR("Failed to set acive codec property");
         pref_cap.ch_mode = A2D_SBC_IE_CH_MD_STEREO;
-    else if (src_cap.ch_mode & A2D_SBC_IE_CH_MD_DUAL)
+    }
+    if (src_cap.ch_mode & A2D_SBC_IE_CH_MD_DUAL) {
+        if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"1") < 0)
+            BTIF_TRACE_ERROR("Failed to set acive codec property");
         pref_cap.ch_mode = A2D_SBC_IE_CH_MD_DUAL;
-    else if (src_cap.ch_mode & A2D_SBC_IE_CH_MD_MONO)
+    }
+    else if (src_cap.ch_mode & A2D_SBC_IE_CH_MD_MONO) {
+        if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"1") < 0)
+            BTIF_TRACE_ERROR("Failed to set acive codec property");
         pref_cap.ch_mode = A2D_SBC_IE_CH_MD_MONO;
-
+    }
     if (src_cap.block_len & A2D_SBC_IE_BLOCKS_16)
         pref_cap.block_len = A2D_SBC_IE_BLOCKS_16;
     else if (src_cap.block_len & A2D_SBC_IE_BLOCKS_12)
@@ -1754,10 +1766,93 @@ static BOOLEAN bta_av_co_audio_peer_supports_codec(tBTA_AV_CO_PEER *p_peer, UINT
         APPL_TRACE_DEBUG("%s SEP codec_type = %d", __func__, codec_type);
     }
 
-/* Check for aptX HD before aptX Classic as
+/*Default: 
+ *Check for aptX HD before aptX Classic as
  * this is order of priority, if supported return true.
  * multicast is not supported for aptX
+ *
+ *If custom codec priority is set, check for SBC/AAC
+ *first before fallung back to default order.
  */
+
+    if (P_SBCHD == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0) 
+       || P_SBCHDP == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0) 
+       || P_SBC == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
+        for (index = 0; index < p_peer->num_sup_snks; index++)
+        {
+            if (p_peer->snks[index].codec_type == codec_type ||
+                p_peer->snks[index].codec_type == bta_av_co_cb.codec_cfg_sbc.id)
+            {
+            switch (p_peer->snks[index].codec_type)
+            {
+                case BTIF_AV_CODEC_SBC:
+                    if (p_snk_index) *p_snk_index = index;
+                    if (bta_av_co_audio_codec_match(p_peer->snks[index].codec_caps, BTIF_AV_CODEC_SBC))
+                    {
+#if  defined(BTA_AV_CO_CP_SCMS_T) && (BTA_AV_CO_CP_SCMS_T == TRUE)
+                        if (bta_av_co_audio_sink_has_scmst(&p_peer->snks[index]))
+#endif
+                        {
+                            bta_av_co_cb.current_codec_id = bta_av_co_cb.codec_cfg_sbc.id;
+                            bta_av_co_cb.codec_cfg = &bta_av_co_cb.codec_cfg_sbc;
+                            APPL_TRACE_ERROR("%s peer codec SBC matched", __func__);
+                            if (P_SBCHDP == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
+                                if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"3") < 0)
+                                    BTIF_TRACE_ERROR("Failed to set acive codec property");
+                            } else if (P_SBCHD == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
+                                if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"2") < 0)
+                                    BTIF_TRACE_ERROR("Failed to set acive codec property");
+                            } else {
+                                if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"1") < 0)
+                                    BTIF_TRACE_ERROR("Failed to set acive codec property");
+                            }
+                            return TRUE;
+                        }
+                    }
+                    break;
+                default:
+                       APPL_TRACE_ERROR("SBC: bta_av_co_audio_peer_supports_codec: unsupported codec id %d", bta_av_co_cb.codec_cfg->id);
+                       break;
+                }
+            }
+        }
+    }
+#if defined(AAC_ENCODER_INCLUDED) && (AAC_ENCODER_INCLUDED == TRUE)
+    if ((bt_split_a2dp_enabled && btif_av_is_codec_offload_supported(AAC)) 
+      && P_AAC == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
+        for (index = 0; index < p_peer->num_sup_snks; index++)
+        {
+            APPL_TRACE_DEBUG("%s AAC: index: %d, codec_type: %d", __func__, index, p_peer->snks[index].codec_type);
+               if (p_peer->snks[index].codec_type == bta_av_co_cb.codec_cfg_aac.id)
+               {
+                   switch (p_peer->snks[index].codec_type)
+                   {
+                    case BTIF_AV_CODEC_M24:
+                        if (p_snk_index) *p_snk_index = index;
+                        if (bta_av_co_audio_codec_match(p_peer->snks[index].codec_caps, BTIF_AV_CODEC_M24))
+                        {
+#if  defined(BTA_AV_CO_CP_SCMS_T) && (BTA_AV_CO_CP_SCMS_T == TRUE)
+                           if (bta_av_co_audio_sink_has_scmst(&p_peer->snks[index]))
+#endif
+                            {
+                                bta_av_co_cb.current_codec_id = bta_av_co_cb.codec_cfg_aac.id;
+                                bta_av_co_cb.codec_cfg = &bta_av_co_cb.codec_cfg_aac;
+                                APPL_TRACE_ERROR("%s peer codec AAC matched", __func__);
+                                if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"6") < 0)
+                                    BTIF_TRACE_ERROR("Failed to set acive codec property");
+                                return TRUE;
+                            }
+                        }
+                        break;
+                    default:
+                       APPL_TRACE_ERROR("AAC: bta_av_co_audio_peer_supports_codec: unsupported codec id %d", bta_av_co_cb.codec_cfg->id);
+                       break;
+                   }
+              }
+        }
+    } else
+        APPL_TRACE_ERROR("%s AAC is bypassed", __func__);
+#endif
     if ((!bt_split_a2dp_enabled && isA2dAptXEnabled && (btif_av_is_multicast_supported() == FALSE)) ||
         (bt_split_a2dp_enabled && (btif_av_is_codec_offload_supported(APTX)|| btif_av_is_codec_offload_supported(APTXHD))))
     {
@@ -1786,8 +1881,6 @@ static BOOLEAN bta_av_co_audio_peer_supports_codec(tBTA_AV_CO_PEER *p_peer, UINT
                     {
                         if (p_snk_index)
                             *p_snk_index = index;
-                        APPL_TRACE_DEBUG("%s aptX HD", __func__);
-
                         if (bta_av_co_audio_codec_match(p_peer->snks[index].codec_caps, A2D_NON_A2DP_MEDIA_CT))
                         {
     #if defined(BTA_AV_CO_CP_SCMS_T) && (BTA_AV_CO_CP_SCMS_T == TRUE)
@@ -1796,6 +1889,9 @@ static BOOLEAN bta_av_co_audio_peer_supports_codec(tBTA_AV_CO_PEER *p_peer, UINT
                             {
                                 bta_av_co_cb.current_codec_id = bta_av_co_cb.codec_cfg_aptx_hd.id;
                                 bta_av_co_cb.codec_cfg = &bta_av_co_cb.codec_cfg_aptx_hd;
+                                APPL_TRACE_ERROR("%s peer codec aptX HD matched", __func__);
+                                if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"5") < 0)
+                                    BTIF_TRACE_ERROR("Failed to set acive codec property");
                                 return TRUE;
                             }
                         }
@@ -1823,7 +1919,6 @@ static BOOLEAN bta_av_co_audio_peer_supports_codec(tBTA_AV_CO_PEER *p_peer, UINT
                 {
                     if (p_snk_index)
                         *p_snk_index = index;
-                    APPL_TRACE_DEBUG("%s aptX", __func__);
                     if (bta_av_co_audio_codec_match(p_peer->snks[index].codec_caps, A2D_NON_A2DP_MEDIA_CT))
                     {
 #if defined(BTA_AV_CO_CP_SCMS_T) && (BTA_AV_CO_CP_SCMS_T == TRUE)
@@ -1832,6 +1927,9 @@ static BOOLEAN bta_av_co_audio_peer_supports_codec(tBTA_AV_CO_PEER *p_peer, UINT
                         {
                             bta_av_co_cb.current_codec_id = bta_av_co_cb.codec_cfg_aptx.id;
                             bta_av_co_cb.codec_cfg = &bta_av_co_cb.codec_cfg_aptx;
+                            APPL_TRACE_ERROR("%s peer codec aptX matched", __func__);
+                            if (property_set("bluetooth.a2dp_active_codec", (char*)"4") < 0)
+                                BTIF_TRACE_ERROR("Failed to set acive codec property");
                             return TRUE;
                         }
                     }
@@ -1863,8 +1961,9 @@ static BOOLEAN bta_av_co_audio_peer_supports_codec(tBTA_AV_CO_PEER *p_peer, UINT
                             {
                                 bta_av_co_cb.current_codec_id = bta_av_co_cb.codec_cfg_aac.id;
                                 bta_av_co_cb.codec_cfg = &bta_av_co_cb.codec_cfg_aac;
-
-                                APPL_TRACE_DEBUG("%s AAC matched", __func__);
+                                APPL_TRACE_ERROR("%s peer codec AAC matched", __func__);
+                                if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"6") < 0)
+                                    BTIF_TRACE_ERROR("Failed to set acive codec property");
                                 return TRUE;
                             }
                         }
@@ -1878,7 +1977,7 @@ static BOOLEAN bta_av_co_audio_peer_supports_codec(tBTA_AV_CO_PEER *p_peer, UINT
               }
         }
     } else
-        APPL_TRACE_DEBUG("%s AAC is disabled", __func__);
+        APPL_TRACE_ERROR("%s AAC is disabled", __func__);
 #endif
 
 
@@ -1892,7 +1991,6 @@ static BOOLEAN bta_av_co_audio_peer_supports_codec(tBTA_AV_CO_PEER *p_peer, UINT
             {
             case BTIF_AV_CODEC_SBC:
                 if (p_snk_index) *p_snk_index = index;
-                APPL_TRACE_DEBUG("%s SBC", __func__);
                 if (bta_av_co_audio_codec_match(p_peer->snks[index].codec_caps, BTIF_AV_CODEC_SBC))
                 {
 #if  defined(BTA_AV_CO_CP_SCMS_T) && (BTA_AV_CO_CP_SCMS_T == TRUE)
@@ -1901,6 +1999,9 @@ static BOOLEAN bta_av_co_audio_peer_supports_codec(tBTA_AV_CO_PEER *p_peer, UINT
                     {
                         bta_av_co_cb.current_codec_id = bta_av_co_cb.codec_cfg_sbc.id;
                         bta_av_co_cb.codec_cfg = &bta_av_co_cb.codec_cfg_sbc;
+                        APPL_TRACE_ERROR("%s peer codec SBC matched", __func__);
+                        if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"2") < 0)
+                            BTIF_TRACE_ERROR("Failed to set acive codec property");
                         return TRUE;
                     }
                 }
@@ -2262,9 +2363,13 @@ BOOLEAN bta_av_co_audio_set_codec(const tBTIF_AV_MEDIA_FEEDINGS *p_feeding, tBTI
     case BTIF_AV_CODEC_PCM:
         new_cfg_sbc.id = BTIF_AV_CODEC_SBC;
 
-        sbc_config = btif_av_sbc_default_config;
-        if (property_get_int32(A2DP_SBC_HD_ENABLE_PROP, 0))
+       if (P_SBC == property_get_int32(A2DP_ACTIVE_ENCODER_PROP, 0)) {
+            sbc_config = btif_av_sbc_default_config;
+        }
+        else {
+            APPL_TRACE_ERROR("codec SBC DUAL mode");
             sbc_config = btif_av_sbc_alt_config;
+        }
         if ((p_feeding->cfg.pcm.num_channel != 1) &&
             (p_feeding->cfg.pcm.num_channel != 2))
         {

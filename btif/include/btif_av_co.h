@@ -23,6 +23,8 @@
 
 /* Definitions for Bluetooth codec selection */
 #define A2DP_PREFERRED_ENCODER_PROP "persist.sys.bt.preferred_codec"
+#define A2DP_ACTIVE_ENCODER_PROP "bluetooth.a2dp_active_codec"
+
 /* A2dp primary codecs */
 #define P_AUTO    0
 #define P_SBC     1

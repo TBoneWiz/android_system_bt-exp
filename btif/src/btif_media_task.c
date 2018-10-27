@@ -56,6 +56,7 @@
 #include "bta_sys_int.h"
 
 #include "bta_av_api.h"
+#include <cutils/properties.h>
 #include "osi/include/thread.h"
 #include "bt_utils.h"
 #include "a2d_api.h"
@@ -74,7 +75,6 @@
 
 #include "osi/include/alarm.h"
 #include "osi/include/fixed_queue.h"
-#include "osi/include/properties.h"
 #include "osi/include/log.h"
 
 #if (BTA_AV_INCLUDED == TRUE)
@@ -211,17 +211,19 @@ enum {
 #endif
 
 #ifdef BTA_AV_SPLIT_A2DP_DEF_FREQ_48KHZ
-#define DEFAULT_SBC_BITRATE 496
+#define DEFAULT_SBC_BITRATE 345
+#define DEFAULT_SBC_ALT_BITRATE 496
 #define BTIF_A2DP_3DH5_BITRATE 601
-#define BTIF_A2DP_2DH5_ALT_BITRATE 649
+#define BTIF_A2DP_2DH5_ALT_BITRATE 557
 
 #ifndef BTIF_A2DP_NON_EDR_MAX_RATE
 #define BTIF_A2DP_NON_EDR_MAX_RATE 237
 #endif
 #else
-#define DEFAULT_SBC_BITRATE 455
+#define DEFAULT_SBC_BITRATE 328
+#define DEFAULT_SBC_ALT_BITRATE 455
 #define BTIF_A2DP_3DH5_BITRATE 552
-#define BTIF_A2DP_2DH5_ALT_BITRATE 596
+#define BTIF_A2DP_2DH5_ALT_BITRATE 512
 
 #ifndef BTIF_A2DP_NON_EDR_MAX_RATE
 #define BTIF_A2DP_NON_EDR_MAX_RATE 229
@@ -882,14 +884,29 @@ static UINT16 btif_media_task_get_sbc_rate(void)
     {
         rate = BTIF_A2DP_NON_EDR_MAX_RATE;
         APPL_TRACE_DEBUG("non-edr a2dp sink detected, restrict rate to %d", rate);
-    } else if (btif_av_peer_supports_3mbps()
-               && btif_media_cb.TxAaMtuSize >= MIN_3MBPS_AVDTP_SAFE_MTU) {
-        rate = BTIF_A2DP_3DH5_BITRATE;
+        if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"1") < 0)
+            BTIF_TRACE_ERROR("Failed to set acive codec property");
     } else if (!btif_av_peer_supports_3mbps()
-               && property_get_int32(A2DP_SBC_HD_PROP, 0)) {
+               && P_SBCHDP == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
+        APPL_TRACE_ERROR("%s codec SBC HD+ 2mbps", __func__);
         rate = BTIF_A2DP_2DH5_ALT_BITRATE;
+    } else if (btif_av_peer_supports_3mbps()
+               && btif_media_cb.TxAaMtuSize >= MIN_3MBPS_AVDTP_SAFE_MTU
+               && (P_SBCHDP == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)
+               || P_SBCHD == property_get_int32(A2DP_ACTIVE_ENCODER_PROP, 0))) {
+        APPL_TRACE_ERROR("%s codec SBC HD+ 3mbps", __func__);
+        if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"3") < 0)
+            BTIF_TRACE_ERROR("Failed to set acive codec property");
+        rate = BTIF_A2DP_3DH5_BITRATE;
+    } else if (P_SBCHD == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
+        APPL_TRACE_ERROR("%s codec SBC HD bit rate", __func__);
+        rate = DEFAULT_SBC_ALT_BITRATE;
+    } else {
+        if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"1") < 0)
+            BTIF_TRACE_ERROR("Failed to set acive codec property");
     }
 
+    APPL_TRACE_ERROR("%s codec SBC rate %hu", __func__, rate);
     return rate;
 }
 
@@ -925,6 +942,38 @@ static void btif_a2dp_encoder_init(tBTA_AV_HNDL hdl)
 
     UINT8 codectype;
     codectype = bta_av_select_codec(hdl);
+    if (P_SBCHD == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0) 
+        || P_SBCHDP == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0) 
+        || P_SBC == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
+        /* Retrieve the current SBC configuration if SBC codec high priority is set */
+        ALOGI("%s Selected Codec SBC", __func__);
+        bta_av_co_audio_get_sbc_config(&sbc_config, &minmtu);
+        msg.NumOfSubBands = (sbc_config.num_subbands == A2D_SBC_IE_SUBBAND_4) ? 4 : 8;
+        msg.NumOfBlocks = codec_block_tbl[sbc_config.block_len >> 5];
+        msg.AllocationMethod = (sbc_config.alloc_mthd == A2D_SBC_IE_ALLOC_MD_L) ? SBC_LOUDNESS : SBC_SNR;
+        msg.ChannelMode = codec_mode_tbl[sbc_config.ch_mode >> 1];
+        msg.SamplingFreq = freq_block_tbl[sbc_config.samp_freq >> 5];
+        msg.MtuSize = minmtu;
+        msg.CodecType = BTIF_AV_CODEC_SBC;
+        APPL_TRACE_EVENT("msg.ChannelMode %x", msg.ChannelMode);
+        /* Init the media task to encode SBC properly */
+        btif_media_task_enc_init_req(&msg);
+        return;
+    }
+#if defined(AAC_ENCODER_INCLUDED) && (AAC_ENCODER_INCLUDED == TRUE)
+    if (BTIF_AV_CODEC_M24 == codectype && P_AAC == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
+        ALOGI("%s Selected Codec AAC", __func__);
+        bta_av_co_audio_get_codec_config ((UINT8*)&aac_config, &minmtu, BTIF_AV_CODEC_M24);
+        msg.ObjectType = aac_config.object_type;
+        msg.ChannelMode = (aac_config.channels == A2D_AAC_IE_CHANNELS_2) ? SBC_STEREO : SBC_MONO;
+        msg.SamplingFreq =  freq_block_tbl[aac_config.samp_freq >> 5];
+        msg.MtuSize = minmtu;
+        msg.CodecType = BTIF_AV_CODEC_M24;
+        msg.bit_rate = aac_config.bit_rate;
+        btif_media_task_enc_init_req(&msg);
+        return;
+    }
+#endif
     if (A2D_NON_A2DP_MEDIA_CT == codectype) {
         UINT8* ptr = bta_av_co_get_current_codecInfo();
         if (ptr) {
@@ -2340,7 +2389,55 @@ static void btif_media_task_enc_init(BT_HDR *p_msg)
 
     btif_media_cb.timestamp = 0;
 
-    if (pInitAudio->CodecType == A2D_NON_A2DP_MEDIA_CT)
+    if (P_SBCHD == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0) 
+        || P_SBCHDP == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0) 
+        || P_SBC == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
+
+        /* SBC encoder initialized first if preferred */
+        btif_media_cb.encoder.s16ChannelMode = pInitAudio->ChannelMode;
+        btif_media_cb.encoder.s16NumOfSubBands = pInitAudio->NumOfSubBands;
+        btif_media_cb.encoder.s16NumOfBlocks = pInitAudio->NumOfBlocks;
+        btif_media_cb.encoder.s16AllocationMethod = pInitAudio->AllocationMethod;
+        btif_media_cb.encoder.s16SamplingFreq = pInitAudio->SamplingFreq;
+
+        btif_media_cb.encoder.u16BitRate = btif_media_task_get_sbc_rate();
+
+        /* Default transcoding is PCM to SBC, modified by feeding configuration */
+        btif_media_cb.TxTranscoding = BTIF_MEDIA_TRSCD_PCM_2_SBC;
+        btif_media_cb.TxAaMtuSize = ((BTIF_MEDIA_AA_BUF_SIZE-BTIF_MEDIA_AA_SBC_OFFSET-sizeof(BT_HDR))
+                < pInitAudio->MtuSize) ? (BTIF_MEDIA_AA_BUF_SIZE - BTIF_MEDIA_AA_SBC_OFFSET
+                - sizeof(BT_HDR)) : pInitAudio->MtuSize;
+
+        APPL_TRACE_EVENT("btif_media_task_enc_init busy %d, mtu %d, peer mtu %d",
+                         btif_media_cb.busy_level, btif_media_cb.TxAaMtuSize, pInitAudio->MtuSize);
+        APPL_TRACE_EVENT("ch mode %d, subnd %d, nb blk %d, alloc %d, rate %d, freq %d",
+            btif_media_cb.encoder.s16ChannelMode, btif_media_cb.encoder.s16NumOfSubBands,
+            btif_media_cb.encoder.s16NumOfBlocks,
+            btif_media_cb.encoder.s16AllocationMethod, btif_media_cb.encoder.u16BitRate,
+            btif_media_cb.encoder.s16SamplingFreq);
+
+        if (!bt_split_a2dp_enabled)
+        {
+            /* Reset entirely the SBC encoder */
+            SBC_Encoder_Init(&(btif_media_cb.encoder));
+    
+            btif_media_cb.tx_sbc_frames = check_for_max_number_of_frames_per_packet();
+
+            APPL_TRACE_DEBUG("btif_media_task_enc_init bit pool %d", btif_media_cb.encoder.s16BitPool);
+        }
+        return;
+    }
+#if defined(AAC_ENCODER_INCLUDED) && (AAC_ENCODER_INCLUDED == TRUE)
+    else if (pInitAudio->CodecType == BTIF_AV_CODEC_M24 && P_AAC == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
+        /*AAC is supported only in split mode, so only update the
+          required MTU size for AAC to send down to FW via VSC*/
+        btif_media_cb.TxAaMtuSize =  ((BTIF_MEDIA_AA_BUF_SIZE-BTIF_MEDIA_AA_AAC_OFFSET-sizeof(BT_HDR))
+            < pInitAudio->MtuSize) ? (BTIF_MEDIA_AA_BUF_SIZE - BTIF_MEDIA_AA_AAC_OFFSET
+            - sizeof(BT_HDR)) : pInitAudio->MtuSize;
+        return;
+    }
+#endif
+    else if (pInitAudio->CodecType == A2D_NON_A2DP_MEDIA_CT)
     {
         APPL_TRACE_EVENT("%s BluetoothVendorID %x, BluetoothCodecID %d", __func__,
                      pInitAudio->BluetoothVendorID, pInitAudio->BluetoothCodecID);
@@ -2435,8 +2532,166 @@ static void btif_media_task_enc_update(BT_HDR *p_msg)
     APPL_TRACE_DEBUG("btif_media_task_enc_update : minmtu %d, maxbp %d minbp %d",
             pUpdateAudio->MinMtuSize, pUpdateAudio->MaxBitPool, pUpdateAudio->MinBitPool);
 
+
+    if (P_SBCHD == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0) 
+        || P_SBCHDP == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0) 
+        || P_SBC == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
+        	
+        if (!pstrEncParams->s16NumOfSubBands)
+        {
+            APPL_TRACE_ERROR("Error: SubBands are set to 0, resetting to Max");
+            pstrEncParams->s16NumOfSubBands = SBC_MAX_NUM_OF_SUBBANDS;
+        }
+        if (!pstrEncParams->s16NumOfBlocks)
+        {
+            APPL_TRACE_ERROR("Error: Blocks are set to 0, resetting to Max");
+            pstrEncParams->s16NumOfBlocks = SBC_MAX_NUM_OF_BLOCKS;
+        }
+        if (!pstrEncParams->s16NumOfChannels)
+        {
+            APPL_TRACE_ERROR("Error: Channels are set to 0, resetting to Max");
+            pstrEncParams->s16NumOfChannels = SBC_MAX_NUM_OF_CHANNELS;
+        }
+
+        btif_media_cb.TxAaMtuSize = ((BTIF_MEDIA_AA_BUF_SIZE -
+                                      BTIF_MEDIA_AA_SBC_OFFSET - sizeof(BT_HDR))
+                < pUpdateAudio->MinMtuSize) ? (BTIF_MEDIA_AA_BUF_SIZE - BTIF_MEDIA_AA_SBC_OFFSET
+                - sizeof(BT_HDR)) : pUpdateAudio->MinMtuSize;
+        /* Set the initial target bit rate */
+        pstrEncParams->u16BitRate = btif_media_task_get_sbc_rate();
+
+        if (pstrEncParams->s16SamplingFreq == SBC_sf16000)
+            s16SamplingFreq = 16000;
+        else if (pstrEncParams->s16SamplingFreq == SBC_sf32000)
+            s16SamplingFreq = 32000;
+        else if (pstrEncParams->s16SamplingFreq == SBC_sf44100)
+            s16SamplingFreq = 44100;
+        else
+            s16SamplingFreq = 48000;
+
+        do
+        {
+            if (pstrEncParams->s16NumOfBlocks == 0 || pstrEncParams->s16NumOfSubBands == 0
+                || pstrEncParams->s16NumOfChannels == 0)
+            {
+                APPL_TRACE_ERROR("btif_media_task_enc_update() - Avoiding division by zero...");
+                APPL_TRACE_ERROR("btif_media_task_enc_update() - block=%d, subBands=%d, channels=%d",
+                    pstrEncParams->s16NumOfBlocks, pstrEncParams->s16NumOfSubBands,
+                    pstrEncParams->s16NumOfChannels);
+                break;
+            }
+
+            if ((pstrEncParams->s16ChannelMode == SBC_JOINT_STEREO) ||
+                (pstrEncParams->s16ChannelMode == SBC_STEREO) )
+            {
+                s16BitPool = (SINT16)( (pstrEncParams->u16BitRate *
+                    pstrEncParams->s16NumOfSubBands * 1000 / s16SamplingFreq)
+                    -( (32 + (4 * pstrEncParams->s16NumOfSubBands *
+                    pstrEncParams->s16NumOfChannels)
+                    + ( (pstrEncParams->s16ChannelMode - 2) *
+                    pstrEncParams->s16NumOfSubBands )   )
+                    / pstrEncParams->s16NumOfBlocks) );
+
+                s16FrameLen = 4 + (4*pstrEncParams->s16NumOfSubBands*
+                    pstrEncParams->s16NumOfChannels)/8
+                    + ( ((pstrEncParams->s16ChannelMode - 2) *
+                    pstrEncParams->s16NumOfSubBands)
+                    + (pstrEncParams->s16NumOfBlocks * s16BitPool) ) / 8;
+
+                s16BitRate = (8 * s16FrameLen * s16SamplingFreq)
+                    / (pstrEncParams->s16NumOfSubBands *
+                    pstrEncParams->s16NumOfBlocks * 1000);
+
+                if (s16BitRate > pstrEncParams->u16BitRate)
+                    s16BitPool--;
+
+                if(pstrEncParams->s16NumOfSubBands == 8)
+                    s16BitPool = (s16BitPool > 255) ? 255 : s16BitPool;
+                else
+                    s16BitPool = (s16BitPool > 128) ? 128 : s16BitPool;
+            }
+            else
+            {
+                s16BitPool = (SINT16)( ((pstrEncParams->s16NumOfSubBands *
+                    pstrEncParams->u16BitRate * 1000)
+                    / (s16SamplingFreq * pstrEncParams->s16NumOfChannels))
+                    -( ( (32 / pstrEncParams->s16NumOfChannels) +
+                    (4 * pstrEncParams->s16NumOfSubBands) )
+                    /   pstrEncParams->s16NumOfBlocks ) );
+
+                pstrEncParams->s16BitPool = (s16BitPool >
+                    (16 * pstrEncParams->s16NumOfSubBands))
+                    ? (16*pstrEncParams->s16NumOfSubBands) : s16BitPool;
+            }
+
+            if (s16BitPool < 0)
+            {
+                s16BitPool = 0;
+            }
+
+            APPL_TRACE_EVENT("bitpool candidate : %d (%d kbps)",
+                         s16BitPool, pstrEncParams->u16BitRate);
+
+            if (s16BitPool > pUpdateAudio->MaxBitPool)
+            {
+                APPL_TRACE_DEBUG("btif_media_task_enc_update computed bitpool too large (%d)",
+                                    s16BitPool);
+                /* Decrease bitrate */
+                btif_media_cb.encoder.u16BitRate -= BTIF_MEDIA_BITRATE_STEP;
+                /* Record that we have decreased the bitrate */
+                protect |= 1;
+            }
+            else if (s16BitPool < pUpdateAudio->MinBitPool)
+            {
+                APPL_TRACE_WARNING("btif_media_task_enc_update computed bitpool too small (%d)", s16BitPool);
+
+                /* Increase bitrate */
+                UINT16 previous_u16BitRate = btif_media_cb.encoder.u16BitRate;
+                btif_media_cb.encoder.u16BitRate += BTIF_MEDIA_BITRATE_STEP;
+                /* Record that we have increased the bitrate */
+                protect |= 2;
+                /* Check over-flow */
+                if (btif_media_cb.encoder.u16BitRate < previous_u16BitRate)
+                    protect |= 3;
+            }
+            else
+            {
+                break;
+            }
+            /* In case we have already increased and decreased the bitrate, just stop */
+            if (protect == 3)
+            {
+                APPL_TRACE_ERROR("btif_media_task_enc_update could not find bitpool in range");
+                break;
+            }
+        } while (1);
+
+        /* Finally update the bitpool in the encoder structure */
+        pstrEncParams->s16BitPool = s16BitPool;
+
+        APPL_TRACE_DEBUG("btif_media_task_enc_update final bit rate %d, final bit pool %d",
+                btif_media_cb.encoder.u16BitRate, btif_media_cb.encoder.s16BitPool);
+
+        if (!bt_split_a2dp_enabled)
+        {
+            /* make sure we reinitialize encoder with new settings */
+            SBC_Encoder_Init(&(btif_media_cb.encoder));
+        }
+        btif_media_cb.tx_sbc_frames = check_for_max_number_of_frames_per_packet();
+       return;
+    }
+#if defined(AAC_ENCODER_INCLUDED) && (AAC_ENCODER_INCLUDED == TRUE)
+    else if (pUpdateAudio->CodecType == BTIF_AV_CODEC_M24 && P_AAC == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
+       APPL_TRACE_EVENT("%s AAC" , __func__);
+       btif_media_cb.TxAaMtuSize = ((BTIF_MEDIA_AA_BUF_SIZE -
+                                      BTIF_MEDIA_AA_AAC_OFFSET - sizeof(BT_HDR))
+                < pUpdateAudio->MinMtuSize) ? (BTIF_MEDIA_AA_BUF_SIZE - BTIF_MEDIA_AA_AAC_OFFSET
+                - sizeof(BT_HDR)) : pUpdateAudio->MinMtuSize;
+       return;
+    }
+#endif
     /* Only update the bitrate and MTU size while timer is running to make sure it has been initialized */
-    if (pUpdateAudio->CodecType == A2D_NON_A2DP_MEDIA_CT)
+    else if (pUpdateAudio->CodecType == A2D_NON_A2DP_MEDIA_CT)
     {
         APPL_TRACE_EVENT("%s BluetoothVendorID %x, BluetoothCodecID %d", __func__,
                      pUpdateAudio->BluetoothVendorID, pUpdateAudio->BluetoothCodecID);
