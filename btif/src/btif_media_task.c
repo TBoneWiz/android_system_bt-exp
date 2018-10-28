@@ -893,7 +893,8 @@ static UINT16 btif_media_task_get_sbc_rate(void)
     } else if (btif_av_peer_supports_3mbps()
                && btif_media_cb.TxAaMtuSize >= MIN_3MBPS_AVDTP_SAFE_MTU
                && (P_SBCHDP == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)
-               || P_SBCHD == property_get_int32(A2DP_ACTIVE_ENCODER_PROP, 0))) {
+               || P_SBCHD == property_get_int32(A2DP_ACTIVE_ENCODER_PROP, 0))
+               && P_SBCHD != property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
         APPL_TRACE_ERROR("%s codec SBC HD+ 3mbps", __func__);
         if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"3") < 0)
             BTIF_TRACE_ERROR("Failed to set acive codec property");
