@@ -21,17 +21,6 @@
 
 #include "btif_media.h"
 
-/* Definitions for Bluetooth codec selection */
-#define A2DP_PREFERRED_ENCODER_PROP "persist.sys.bt.preferred_codec"
-/* A2dp primary codecs */
-#define P_AUTO    0
-#define P_SBC     1
-#define P_SBCHD   2
-#define P_SBCHDP  3
-#define P_APTX    4
-#define P_APTXHD  5
-#define P_AAC     6
-
 /*******************************************************************************
 **  Functions
 ********************************************************************************/
