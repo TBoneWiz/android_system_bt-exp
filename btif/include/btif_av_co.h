@@ -21,6 +21,19 @@
 
 #include "btif_media.h"
 
+/* Property definitions for A2DP codec selection and detection */
+#define A2DP_PREFERRED_ENCODER_PROP "persist.sys.bt.preferred_codec"
+#define A2DP_ACTIVE_ENCODER_PROP "bluetooth.a2dp_active_codec"
+
+/* A2dp codec enumeration */
+#define P_AUTO    0
+#define P_SBC     1
+#define P_SBCHD   2
+#define P_SBCHDP  3
+#define P_APTX    4
+#define P_APTXHD  5
+#define P_AAC     6
+
 /*******************************************************************************
 **  Functions
 ********************************************************************************/
