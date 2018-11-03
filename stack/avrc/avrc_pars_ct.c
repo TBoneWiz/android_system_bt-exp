@@ -18,7 +18,6 @@
  *
  ******************************************************************************/
 #include <string.h>
-#include <log/log.h>
 
 #include "gki.h"
 #include "avrc_api.h"
