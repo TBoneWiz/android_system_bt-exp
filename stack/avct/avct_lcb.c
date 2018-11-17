@@ -222,7 +222,7 @@ void avct_lcb_event(tAVCT_LCB *p_lcb, UINT8 event, tAVCT_LCB_EVT *p_data)
 #if BT_TRACE_VERBOSE == TRUE
     BTIF_TRACE_IMP("LCB lcb=%d event=%s state=%s", p_lcb->allocated, avct_lcb_evt_str[event], avct_lcb_st_str[p_lcb->state]);
 #else
-    BTIF_TRACE_IMP("LCB lcb=%d event=%d state=%d", p_lcb->allocated, event, p_lcb->state);
+    BTIF_TRACE_DEBUG("LCB lcb=%d event=%d state=%d", p_lcb->allocated, event, p_lcb->state);
 #endif
 
     /* look up the state table for the current state */

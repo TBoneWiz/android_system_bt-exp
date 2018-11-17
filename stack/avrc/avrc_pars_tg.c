@@ -401,7 +401,7 @@ tAVRC_STS AVRC_Ctrl_ParsCommand (tAVRC_MSG *p_msg, tAVRC_COMMAND *p_result, UINT
         p_result->cmd.opcode = p_msg->hdr.opcode;
         p_result->cmd.status = status;
     }
-    BTIF_TRACE_IMP("AVRC_Ctrl_ParsCommand() return status:0x%x",
+    BTIF_TRACE_DEBUG("AVRC_Ctrl_ParsCommand() return status:0x%x",
             __FUNCTION__, status);
     return status;
 }
@@ -444,7 +444,7 @@ tAVRC_STS AVRC_ParsCommand (tAVRC_MSG *p_msg, tAVRC_COMMAND *p_result, UINT8 *p_
         p_result->cmd.opcode = p_msg->hdr.opcode;
         p_result->cmd.status = status;
     }
-    BTIF_TRACE_IMP("AVRC_ParsCommand() return status:0x%x", status);
+    BTIF_TRACE_DEBUG("AVRC_ParsCommand() return status:0x%x", status);
     return status;
 }
 

@@ -1480,7 +1480,7 @@ void btif_rc_handler(tBTA_AV_EVT event, tBTA_AV *p_data)
 {
     UINT8 index;
 
-    BTIF_TRACE_IMP("%s event:%s", __FUNCTION__, dump_rc_event(event));
+    BTIF_TRACE_DEBUG("%s event:%s", __FUNCTION__, dump_rc_event(event));
 
     switch (event)
     {
@@ -1966,7 +1966,7 @@ static void btif_rc_upstreams_evt(UINT16 event, tAVRC_COMMAND *pavrc_cmd, UINT8 
     BD_ADDR address;
 
     bdcpy(remote_addr.address, btif_rc_cb[index].rc_addr);
-    BTIF_TRACE_IMP("%s pdu: %s handle: 0x%x ctype:%x label:%x", __FUNCTION__,
+    BTIF_TRACE_DEBUG("%s pdu: %s handle: 0x%x ctype:%x label:%x", __FUNCTION__,
         dump_rc_pdu(pavrc_cmd->pdu), btif_rc_cb[index].rc_handle, ctype, label);
 
     switch (event)
@@ -3095,7 +3095,7 @@ static bt_status_t register_notification_rsp(btrc_event_id_t event_id,
     }
 
 
-    BTIF_TRACE_IMP("## %s ## event_id:%s", __FUNCTION__, dump_rc_notification_event_id(event_id));
+    BTIF_TRACE_DEBUG("## %s ## event_id:%s", __FUNCTION__, dump_rc_notification_event_id(event_id));
     if (btif_rc_cb[index].rc_notif[event_id-1].bNotify == FALSE)
     {
         BTIF_TRACE_ERROR("Avrcp Event id not registered: event_id = %x", event_id);

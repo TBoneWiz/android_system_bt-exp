@@ -295,7 +295,7 @@ static void bta_av_rc_msg_cback(UINT8 handle, UINT8 label, UINT8 opcode, tAVRC_M
     UINT8           *p_data_src = NULL;
     UINT16          data_len = 0;
 
-    BTIF_TRACE_IMP("%s handle: %u opcode=0x%x", __func__, handle, opcode);
+    BTIF_TRACE_DEBUG("%s handle: %u opcode=0x%x", __func__, handle, opcode);
 
     /* Determine the size of the buffer we need */
     if (opcode == AVRC_OP_VENDOR && p_msg->vendor.p_vendor_data != NULL) {

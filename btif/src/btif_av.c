@@ -1354,7 +1354,7 @@ static BOOLEAN btif_av_state_started_handler(btif_sm_event_t event, void *p_data
     btif_sm_state_t state = BTIF_AV_STATE_IDLE;
     int i;
 
-    BTIF_TRACE_IMP("%s event:%s flags %x  index =%d", __FUNCTION__,
+    BTIF_TRACE_DEBUG("%s event:%s flags %x  index =%d", __FUNCTION__,
                      dump_av_sm_event_name(event), btif_av_cb[index].flags, index);
 
     switch (event)
