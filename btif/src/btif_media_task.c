@@ -111,8 +111,6 @@ OI_INT16 pcmData[15*SBC_MAX_SAMPLES_PER_FRAME*SBC_MAX_CHANNELS];
 #include "bta_api.h"
 #endif
 
-#define A2DP_SBC_HD_PROP "persist.bt.sbc_hd_higher_kbps"
-
 /*****************************************************************************
  **  Constants
  *****************************************************************************/
