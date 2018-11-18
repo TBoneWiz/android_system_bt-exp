@@ -463,8 +463,8 @@ void handle_rc_features(int index)
         avdtp_addr = btif_av_get_addr(btif_rc_cb[index].rc_addr);
 
         BTIF_TRACE_DEBUG("AVDTP Address : %s AVCTP address: %s",
-                         bdaddr_to_string(&avdtp_addr, &addr1, sizeof(bdstr_t)),
-                         bdaddr_to_string(&rc_addr, &addr2, sizeof(bdstr_t)) );
+                         bdaddr_to_string(&avdtp_addr, addr1, sizeof(bdstr_t)),
+                         bdaddr_to_string(&rc_addr, addr2, sizeof(bdstr_t)) );
 
         if (btif_rc_cb[index].rc_features & BTA_AV_FEAT_BROWSE)
         {
@@ -1015,9 +1015,6 @@ void handle_rc_passthrough_cmd ( tBTA_AV_REMOTE_CMD *p_remote_cmd)
  ***************************************************************************/
 void btif_rc_send_pause_command()
 {
-    int rc_id;
-
-    rc_id = BTA_AV_RC_PAUSE;
     BTIF_TRACE_DEBUG("Send Pause to music if playing is remotely disconnected");
 
     send_key(uinput_fd, KEY_PAUSECD, 1);
@@ -3181,7 +3178,7 @@ static bt_status_t get_folderitem_rsp(btrc_folder_list_entries_t *rsp, bt_bdaddr
 {
     tAVRC_RESPONSE avrc_rsp;
     tAVRC_ITEM item[MAX_FOLDER_RSP_SUPPORT]; //Number of players that could be supported
-    UINT8  index, i, xx, media_attr_cnt;
+    UINT8  i, xx, media_attr_cnt;
     UINT8 *p_conversion;
     int rc_index;
     CHECK_RC_CONNECTED
@@ -3194,7 +3191,6 @@ static bt_status_t get_folderitem_rsp(btrc_folder_list_entries_t *rsp, bt_bdaddr
         return BT_STATUS_FAIL;
     }
     BTIF_TRACE_EVENT("%s() AVRC_PDU_GET_FOLDER_ITEMS", __FUNCTION__);
-    index                             = IDX_GET_FOLDER_ITEMS_RSP ;
     avrc_rsp.get_items.pdu            = AVRC_PDU_GET_FOLDER_ITEMS;
     avrc_rsp.get_items.opcode         = AVRC_OP_BROWSE;
     avrc_rsp.get_items.uid_counter    = rsp->uid_counter;
@@ -3808,7 +3804,6 @@ static void handle_avk_rc_metamsg_rsp(tBTA_AV_META_MSG *pmeta_msg)
     tAVRC_RESPONSE    avrc_response = {0};
     UINT8             scratch_buf[4096] = {0};// maximum size that can be used
     UINT16            buf_len;
-    tAVRC_STS status = BT_STATUS_UNSUPPORTED;
     index = btif_rc_get_idx_by_rc_handle(pmeta_msg->rc_handle);
 
     BTIF_TRACE_DEBUG(" %s opcode = %d rsp_code = %d  ",__FUNCTION__,
@@ -3817,7 +3812,6 @@ static void handle_avk_rc_metamsg_rsp(tBTA_AV_META_MSG *pmeta_msg)
                 (pmeta_msg->code >= AVRC_RSP_NOT_IMPL)&&
                 (pmeta_msg->code <= AVRC_RSP_INTERIM))
     {
-        status=AVRC_Ctrl_ParsResponse(pmeta_msg->p_msg, &avrc_response, scratch_buf, &buf_len);
         BTIF_TRACE_DEBUG(" pdu = %d rsp_status = %d",avrc_response.pdu,
                                     pmeta_msg->p_msg->vendor.hdr.ctype);
 
@@ -3904,6 +3898,11 @@ static void handle_avk_rc_metamsg_cmd(tBTA_AV_META_MSG *pmeta_msg)
     }
 }
 #endif
+
+static void btif_rc_handler_wrapper(UINT16 event, char* p_param)
+{
+    btif_rc_handler((tBTA_AV_EVT)event, (tBTA_AV *)p_param);
+}
 /***************************************************************************
 **
 ** Function         cleanup
@@ -3916,7 +3915,7 @@ static void handle_avk_rc_metamsg_cmd(tBTA_AV_META_MSG *pmeta_msg)
 static void cleanup(void)
 {
     BTIF_TRACE_EVENT("## RC:  %s ##", __FUNCTION__);
-    btif_transfer_context(btif_rc_handler, BTIF_AV_CLEANUP_REQ_EVT,
+    btif_transfer_context(btif_rc_handler_wrapper, BTIF_AV_CLEANUP_REQ_EVT,
             NULL, 0, NULL);
     BTIF_TRACE_EVENT("## RC: %s ## completed", __FUNCTION__);
 }
