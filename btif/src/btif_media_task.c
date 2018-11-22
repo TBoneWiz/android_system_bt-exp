@@ -467,25 +467,11 @@ extern int btif_max_av_clients;
  **  Misc helper functions
  *****************************************************************************/
 
-static void log_tstamps_us(char *comment)
+static void log_tstamps_us(char *comment, uint64_t now_us)
 {
-    #define USEC_PER_MSEC 1000L
-    static UINT64 prev_us = 0;
-    const UINT64 now_us = time_now_us();
-    static UINT64 diff_us = 0;
-
-    diff_us = now_us - prev_us;
-    if ((diff_us / USEC_PER_MSEC) > (BTIF_MEDIA_TIME_TICK + 10))
-    {
-        APPL_TRACE_ERROR("[%s] ts %08llu, diff : %08llu, queue sz %d", comment, now_us, diff_us,
+    static uint64_t prev_us = 0;
+    APPL_TRACE_DEBUG("[%s] ts %08llu, diff : %08llu, queue sz %d", comment, now_us, now_us - prev_us,
                 fixed_queue_length(btif_media_cb.TxAaQ));
-    }
-    else
-    {
-        APPL_TRACE_DEBUG("[%s] ts %08llu, diff : %08llu, queue sz %d", comment, now_us, diff_us,
-                fixed_queue_length(btif_media_cb.TxAaQ));
-    }
-
     prev_us = now_us;
 }
 
@@ -885,17 +871,17 @@ static UINT16 btif_media_task_get_sbc_rate(void)
         if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"1") < 0)
             BTIF_TRACE_ERROR("Failed to set active codec property");
     } else if (P_SBCHD == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
-        APPL_TRACE_ERROR("%s codec SBC HD bit rate", __func__);
+        APPL_TRACE_EVENT("%s codec SBC HD bit rate", __func__);
         rate = DEFAULT_SBC_ALT_BITRATE;
     } else if (!btif_av_peer_supports_3mbps()
                && P_SBCHDP == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0)) {
-        APPL_TRACE_ERROR("%s codec SBC HD+ 2mbps", __func__);
+        APPL_TRACE_EVENT("%s codec SBC HD+ 2mbps", __func__);
         rate = BTIF_A2DP_2DH5_ALT_BITRATE;
     } else if ((btif_av_peer_supports_3mbps()
                && btif_media_cb.TxAaMtuSize >= MIN_3MBPS_AVDTP_SAFE_MTU)
                && (P_SBCHD == property_get_int32(A2DP_ACTIVE_ENCODER_PROP, 0)
                || P_SBCHDP == property_get_int32(A2DP_PREFERRED_ENCODER_PROP, 0))) {
-        APPL_TRACE_ERROR("%s codec SBC HD+ 3mbps", __func__);
+        APPL_TRACE_EVENT("%s codec SBC HD+ 3mbps", __func__);
         if (property_set(A2DP_ACTIVE_ENCODER_PROP, (char*)"3") < 0)
             BTIF_TRACE_ERROR("Failed to set active codec property");
         rate = BTIF_A2DP_3DH5_BITRATE;
@@ -904,7 +890,7 @@ static UINT16 btif_media_task_get_sbc_rate(void)
             BTIF_TRACE_ERROR("Failed to set active codec property");
     }
 
-    APPL_TRACE_ERROR("%s codec SBC rate %hu", __func__, rate);
+    APPL_TRACE_EVENT("%s codec SBC rate %hu", __func__, rate);
     return rate;
 }
 
@@ -1791,7 +1777,7 @@ static void btif_media_task_avk_handle_timer(UNUSED_ATTR void *context) {}
 static void btif_media_task_aa_handle_timer(UNUSED_ATTR void *context)
 {
     uint64_t timestamp_us = time_now_us();
-    log_tstamps_us("media task tx timer");
+    log_tstamps_us("media task tx timer", timestamp_us);
 
 #if (BTA_AV_INCLUDED == TRUE)
     if (alarm_is_scheduled(btif_media_cb.media_alarm))
