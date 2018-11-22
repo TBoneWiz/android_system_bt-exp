@@ -259,9 +259,9 @@ enum {
 /* fixme -- define this in pcm time instead of buffer count */
 
 #ifndef MAX_PCM_FRAME_NUM_PER_TICK
-#define MAX_PCM_FRAME_NUM_PER_TICK     14
+#define MAX_PCM_FRAME_NUM_PER_TICK     22
 #endif
-#define MAX_PCM_ITER_NUM_PER_TICK     3
+#define MAX_PCM_ITER_NUM_PER_TICK     4
 
 /**
  * The typical runlevel of the tx queue size is ~1 buffer
